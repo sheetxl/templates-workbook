@@ -39,6 +39,7 @@ const THUMBNAIL = { width: 480, height: 300 };
 const LOAD_TIMEOUT = 60_000;
 
 const HAND_MADE = [".png", ".webp"];
+const TEMPLATE_REGEX = /\.(?:xlsx|sxl|csv)$/i;
 
 /** Each scheme's file-name suffix, before the extension. */
 const SCHEMES = { light: "", dark: ".dark" } as const;
@@ -56,8 +57,8 @@ async function listJobs(filter?: string): Promise<Job[]> {
     const names = new Set(await fs.readdir(path.join(SRC, dir.name)));
     for (const name of names) {
       // `~$<name>.xlsx` is the lock file Excel keeps beside a workbook it has open.
-      if (!name.toLowerCase().endsWith(".xlsx") || name.startsWith("~$")) continue;
-      const base = name.slice(0, -".xlsx".length);
+      if (!TEMPLATE_REGEX.test(name) || name.startsWith("~$")) continue;
+      const base = name.replace(TEMPLATE_REGEX, "");
       const rel = `${dir.name}/${name}`;
       if (filter && !rel.includes(filter)) continue;
       for (const [scheme, suffix] of Object.entries(SCHEMES) as [Scheme, string][]) {
@@ -111,7 +112,7 @@ async function main(): Promise<void> {
           },
         });
         const webp = await sharp(png).resize(THUMBNAIL.width, THUMBNAIL.height, { fit: "cover", position: "left top" }).webp({ quality: 82 }).toBuffer();
-        const out = path.join(OUT, rel.replace(/\.xlsx$/i, `${SCHEMES[scheme]}.webp`));
+        const out = path.join(OUT, rel.replace(TEMPLATE_REGEX, `${SCHEMES[scheme]}.webp`));
         await fs.mkdir(path.dirname(out), { recursive: true });
         await fs.writeFile(out, webp);
         console.log(`  ok  ${label}  ${(webp.length / 1024).toFixed(1)} KB`);

@@ -1,5 +1,5 @@
 /**
- * Renders one template for its thumbnail: `?src=<category>/<name>.xlsx&scheme=light|dark`.
+ * Renders one template for its thumbnail: `?src=<category>/<name>.xlsx|.sxl|.csv&scheme=light|dark`.
  *
  * The grid is the same renderer the gallery opens the template in, so the thumbnail shows what the
  * user will get. It is rendered chromeless, with the row/column headers hidden, and

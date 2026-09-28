@@ -1,7 +1,8 @@
 /**
  * Validates every template under `templates/` and writes the catalog `dist/` that unpkg serves.
  *
- *   templates/<category>/<name>.xlsx           a template; its title is the file name, title-cased
+ *   templates/<category>/<name>.xlsx|.sxl|.csv a template; its title is the file name, title-cased
+ *   templates/<category>/<name>.txt            optional plain-text description, the gallery tooltip
  *   templates/<category>/<name>.webp|.png      optional hand-made thumbnail, copied through
  *   templates/<category>/<name>.dark.webp|.png optional hand-made dark thumbnail
  *   .thumbnails/<category>/<name>[.dark].webp   the rendered thumbnails (`npm run thumbnails`), used
@@ -12,7 +13,7 @@
  *
  *   dist/contents.json                              root listing of every file and folder
  *   dist/workbook-templates/contents.json           the catalog
- *   dist/workbook-templates/<category>/<name>.xlsx
+ *   dist/workbook-templates/<category>/<name>.xlsx|.sxl|.csv
  *   dist/workbook-templates/<category>/<name>.webp|.png
  *   dist/workbook-templates/<category>/<name>.dark.webp|.png
  *
@@ -30,7 +31,13 @@ await WorkbookIO.install(IOPlugin);
 const PACKAGE = "workbook-templates";
 const SCHEMA = 1;
 const MAX_BYTES = 2 * 1024 * 1024;
+/** The template formats, by file extension, and the SDK format each is read as. */
+const TEMPLATE_FORMATS: Record<string, string> = { ".xlsx": "xlsx", ".sxl": "sxl", ".csv": "csv" };
+const TEMPLATE_EXTENSIONS = Object.keys(TEMPLATE_FORMATS);
 const THUMBNAIL_EXTENSIONS = [".webp", ".png"];
+const DESCRIPTION_EXTENSION = ".txt";
+/** A description is a tooltip, not documentation. */
+const MAX_DESCRIPTION_LENGTH = 300;
 /** The file-name suffix of a dark thumbnail, before the extension. */
 const DARK_SUFFIX = ".dark";
 
@@ -77,6 +84,7 @@ interface Entry {
   path: string;
   category: string;
   title: string;
+  description?: string;
   thumbnail?: string;
   /** The thumbnail on the dark grid. */
   thumbnailDark?: string;
@@ -150,6 +158,21 @@ async function readCategory(file: string): Promise<CategoryFile> {
     order: typeof obj.order === "number" ? obj.order : undefined,
     icon: optString(where, obj, "icon"),
   };
+}
+
+/** A description sidecar: plain text, whitespace collapsed to single spaces. */
+async function readDescription(file: string): Promise<string | undefined> {
+  const where = posix(path.relative(process.cwd(), file));
+  const text = (await fs.readFile(file, "utf-8")).replace(/^﻿/, "").replace(/\s+/g, " ").trim();
+  if (!text) {
+    fail(where, "description is empty");
+    return undefined;
+  }
+  if (/<\/?[a-z][^>]*>/i.test(text)) fail(where, "descriptions are plain text; the gallery shows markup as-is");
+  if (text.length > MAX_DESCRIPTION_LENGTH) {
+    fail(where, `description is ${text.length} characters; keep it under ${MAX_DESCRIPTION_LENGTH}`);
+  }
+  return text;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -240,8 +263,8 @@ async function inspectWorkbook(wb: IWorkbook): Promise<WorkbookFindings> {
   const otherErrors: string[] = [];
   let formulas = 0;
 
-  // TODO(scripts): the 0.8.0-beta.1 xlsx writer does not persist script modules, so no .xlsx can
-  // exercise this today. It is kept so the gate holds once xlsx carries scripts.
+  // The 0.8.0-beta.1 xlsx writer does not persist script modules, so today only an .sxl can carry
+  // them.
   const modules = wb.getScripts().getModules().getItems();
   for (const module of modules) add("scripts", (module as any).getName?.() ?? "module");
 
@@ -304,17 +327,20 @@ async function inspectWorkbook(wb: IWorkbook): Promise<WorkbookFindings> {
 async function validateTemplate(file: string): Promise<string> {
   const where = posix(path.relative(process.cwd(), file));
   const buf = await fs.readFile(file);
+  const format = TEMPLATE_FORMATS[path.extname(file).toLowerCase()];
 
   const gate = new Map<GateItem, string[]>();
   const merge = (from: Map<GateItem, string[]>) => {
     for (const [item, details] of from) gate.set(item, [...(gate.get(item) ?? []), ...details]);
   };
   if (buf.byteLength > MAX_BYTES) gate.set("size", [`${(buf.byteLength / 1024 / 1024).toFixed(2)} MB`]);
-  try {
-    merge(inspectPackage(buf));
-  } catch (err: any) {
-    fail(where, `cannot read the package: ${err.message}`);
-    return "unreadable";
+  if (format === "xlsx") {
+    try {
+      merge(inspectPackage(buf));
+    } catch (err: any) {
+      fail(where, `cannot read the package: ${err.message}`);
+      return "unreadable";
+    }
   }
 
   let wb: IWorkbook | null = null;
@@ -322,7 +348,7 @@ async function validateTemplate(file: string): Promise<string> {
     wb = await WorkbookIO.read({
       source: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
       name: path.basename(file),
-      format: "xlsx",
+      format,
     } as any);
   } catch (err: any) {
     fail(where, `does not open: ${err.message ?? err}`);
@@ -361,7 +387,7 @@ async function build(): Promise<void> {
   for (const item of top) {
     if (item.name.startsWith(".")) continue;
     if (item.isFile()) {
-      fail(`templates/${item.name}`, "templates must sit in a category folder (templates/<category>/<name>.xlsx)");
+      fail(`templates/${item.name}`, "templates must sit in a category folder (templates/<category>/<name>.xlsx|.sxl|.csv)");
     }
   }
 
@@ -373,6 +399,14 @@ async function build(): Promise<void> {
     const files = await fs.readdir(catDir, { withFileTypes: true });
     const names = new Set(files.filter((f) => f.isFile()).map((f) => f.name));
     const catInfo = names.has("_category.json") ? await readCategory(path.join(catDir, "_category.json")) : {};
+    /** Template file names by base name. Thumbnails and descriptions are matched on the base name. */
+    const templates = new Map<string, string[]>();
+    for (const name of names) {
+      const ext = path.extname(name).toLowerCase();
+      if (!TEMPLATE_EXTENSIONS.includes(ext) || name.startsWith("~$")) continue;
+      const base = name.slice(0, name.length - ext.length);
+      templates.set(base, [...(templates.get(base) ?? []), name]);
+    }
 
     let count = 0;
     for (const f of files) {
@@ -388,14 +422,19 @@ async function build(): Promise<void> {
       if (f.name === "_category.json") continue;
       if (THUMBNAIL_EXTENSIONS.includes(ext)) {
         const owner = base.endsWith(DARK_SUFFIX) ? base.slice(0, -DARK_SUFFIX.length) : base;
-        if (!names.has(`${owner}.xlsx`)) fail(rel, `thumbnail has no matching ${owner}.xlsx`);
+        if (!templates.has(owner)) fail(rel, `thumbnail has no matching template ${owner}.xlsx|.sxl|.csv`);
         continue;
       }
-      if (ext !== ".xlsx") {
-        fail(rel, `unsupported file type "${ext}"; templates are .xlsx`);
+      if (ext === DESCRIPTION_EXTENSION) {
+        if (!templates.has(base)) fail(rel, `description has no matching template ${base}.xlsx|.sxl|.csv`);
+        continue;
+      }
+      if (!TEMPLATE_EXTENSIONS.includes(ext)) {
+        fail(rel, `unsupported file type "${ext}"; templates are ${TEMPLATE_EXTENSIONS.join(", ")}`);
         continue;
       }
       if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(base)) fail(rel, "template file names must be lowercase-kebab-case");
+      if (templates.get(base)!.length > 1) fail(rel, `another template shares the name "${base}" (${templates.get(base)!.join(", ")})`);
 
       const before = problems.length;
       const summary = await validateTemplate(path.join(catDir, f.name));
@@ -406,6 +445,11 @@ async function build(): Promise<void> {
         category: id,
         title: toName(base),
       };
+      const descriptionName = `${base}${DESCRIPTION_EXTENSION}`;
+      if (names.has(descriptionName)) {
+        const description = await readDescription(path.join(catDir, descriptionName));
+        if (description) entry.description = description;
+      }
       for (const [key, suffix] of [["thumbnail", ""], ["thumbnailDark", DARK_SUFFIX]] as const) {
         const handMade = THUMBNAIL_EXTENSIONS.map((e) => `${base}${suffix}${e}`).find((n) => names.has(n));
         const rendered = path.join(RENDERED, id, `${base}${suffix}.webp`);

@@ -1,0 +1,1 @@
+Enter the loan amount, rate and term to get the payment, total interest, payoff date and a full amortization schedule.

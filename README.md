@@ -20,13 +20,16 @@ them however you like.
 
 ## Adding a template
 
-Drop an `.xlsx` into a category folder under `templates/` and open a pull request. That is all. CI
-validates the workbook, builds the index and publishes it.
+Drop an `.xlsx`, `.sxl` or `.csv` into a category folder under `templates/` and open a pull request.
+That is all. CI validates the workbook, builds the index and publishes it.
 
 - **The file name is the title.** `yearly-calendar.xlsx` is shown as "Yearly Calendar". Use
   lowercase-kebab-case names.
 - **The folder is the category.** Use an existing folder, or create a new one. There is one level
-  only; an `.xlsx` directly in `templates/` fails the build.
+  only; a template directly in `templates/` fails the build.
+- **A `<name>.txt` beside the template is its description.** The gallery shows it as the tile's
+  tooltip and searches it. Keep it to a sentence or two of plain text (under 300 characters); line
+  breaks are folded to spaces and markup fails the build.
 - **Thumbnails come from CI.** You do not need to make one. CI opens each template in the pinned
   SheetXL studio (`render/`) and photographs its first screen twice: once light, and once dark with
   the dark grid on. The headers and the selection are left out. A hand-made `<name>.png` (or
@@ -46,7 +49,8 @@ submit Microsoft Office templates or close copies of them.
 templates/
   <category>/
     _category.json        optional: { "title", "description", "order", "icon" }
-    <name>.xlsx           a template
+    <name>.xlsx           a template (or <name>.sxl, <name>.csv)
+    <name>.txt            optional plain-text description, the tile's tooltip
     <name>.png            optional hand-made thumbnail
     <name>.dark.png       optional hand-made dark thumbnail
 config/thumbnails.ts      renders .thumbnails/<category>/<name>[.dark].webp for each template
@@ -63,7 +67,7 @@ The build writes:
 ```text
 dist/contents.json                                root listing of every file and folder
 dist/workbook-templates/contents.json             the catalog
-dist/workbook-templates/<category>/<name>.xlsx
+dist/workbook-templates/<category>/<name>.xlsx      or .sxl, .csv
 dist/workbook-templates/<category>/<name>.webp    the rendered thumbnail, or a hand-made .png
 dist/workbook-templates/<category>/<name>.dark.webp   the same on the dark grid
 ```
@@ -81,6 +85,7 @@ The catalog looks like this. Entry paths are relative to `dist/workbook-template
   "entries": [
     {
       "path": "finance/loan-calculator.xlsx", "category": "finance", "title": "Loan Calculator",
+      "description": "Enter the loan amount, rate and term to get the payment, ...",
       "thumbnail": "finance/loan-calculator.webp", "thumbnailDark": "finance/loan-calculator.dark.webp"
     }
   ]
@@ -89,7 +94,7 @@ The catalog looks like this. Entry paths are relative to `dist/workbook-template
 
 ## What the build checks
 
-Each `.xlsx` must open in the SheetXL SDK and fully recalculate with no `#NAME?` in any cell. The
+Each template must open in the SheetXL SDK and fully recalculate with no `#NAME?` in any cell. The
 build also fails on a template that contains any of:
 
 - SheetXL script modules;
@@ -99,7 +104,8 @@ build also fails on a template that contains any of:
 - a hyperlink that is not `https:`;
 - more than 2 MB.
 
-Any other file in a category folder, besides `_category.json` and thumbnails, also fails the build.
+Any other file in a category folder, besides `_category.json`, thumbnails and descriptions, also
+fails the build, as do two templates with the same name and different extensions.
 
 ## Publishing
 

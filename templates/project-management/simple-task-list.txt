@@ -1,0 +1,1 @@
+Track tasks by owner, priority, status and due date. Drop-downs keep entries consistent, overdue work turns red, and a summary counts progress.
