@@ -26,17 +26,17 @@ That is all. CI validates the workbook, builds the index and publishes it.
 - **The file name is the title.** `yearly-calendar.xlsx` is shown as "Yearly Calendar". Use
   lowercase-kebab-case names.
 - **The folder is the category.** Use an existing folder, or create a new one. There is one level
-  only; a template directly in `templates/` fails the build.
+  only; a template directly in `templates/` is ignored.
 - **A `<name>.txt` beside the template is its description.** The gallery shows it as the tile's
   tooltip and searches it. Keep it to a sentence or two of plain text (under 300 characters); line
-  breaks are folded to spaces and markup fails the build.
+  breaks are folded to spaces, and markup keeps the template out of the catalog.
 - **Thumbnails come from CI.** You do not need to make one. CI opens each template in the pinned
   SheetXL studio (`render/`) and photographs its first screen twice: once light, and once dark with
   the dark grid on. The headers and the selection are left out. A hand-made `<name>.png` (or
   `<name>.dark.png`) beside the template is used instead, for a template whose first screen is not
   its best.
 
-To check a template before you push, run `npm install` and `npm run build`. To see its thumbnails,
+To check a template before you push, run `npm install` and `npm run build -- --strict`. To see its thumbnails,
 run `npx playwright install chromium` once, then `npm run thumbnails` before the build; the images
 land in `.thumbnails/`.
 
@@ -94,8 +94,8 @@ The catalog looks like this. Entry paths are relative to `dist/workbook-template
 
 ## What the build checks
 
-Each template must open in the SheetXL SDK and fully recalculate with no `#NAME?` in any cell. The
-build also fails on a template that contains any of:
+Each template must open in the SheetXL SDK and fully recalculate with no `#NAME?` in any cell. A
+template that also contains any of these fails the checks:
 
 - SheetXL script modules;
 - a VBA project;
@@ -104,8 +104,14 @@ build also fails on a template that contains any of:
 - a hyperlink that is not `https:`;
 - more than 2 MB.
 
-Any other file in a category folder, besides `_category.json`, thumbnails and descriptions, also
-fails the build, as do two templates with the same name and different extensions.
+Two templates with the same name and different extensions also fail, as does an invalid
+description. Any other file in a category folder, besides `_category.json`, thumbnails and
+descriptions, is ignored with a warning.
+
+A template that fails is left out of the catalog, and a category folder with an invalid name or
+`_category.json` is left out with its templates. The build lists every problem as a warning (and as
+an annotation in GitHub Actions) and publishes the rest; it fails only when no template passes.
+`npm run build -- --strict` fails on any problem instead.
 
 ## Publishing
 

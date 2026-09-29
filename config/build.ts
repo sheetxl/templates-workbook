@@ -17,7 +17,9 @@
  *   dist/workbook-templates/<category>/<name>.webp|.png
  *   dist/workbook-templates/<category>/<name>.dark.webp|.png
  *
- * Any problem fails the build with every problem listed, not just the first.
+ * A template with a problem is left out of the catalog, and a category with a problem is left out
+ * with its templates; every problem is listed as a warning and the build succeeds. Only a catalog
+ * with no templates at all fails it. `--strict` fails the build on any problem instead.
  */
 import fs from "fs/promises";
 import path from "path";
@@ -41,12 +43,14 @@ const MAX_DESCRIPTION_LENGTH = 300;
 /** The file-name suffix of a dark thumbnail, before the extension. */
 const DARK_SUFFIX = ".dark";
 
+const STRICT = process.argv.includes("--strict");
+
 const SRC = path.resolve("templates");
 const RENDERED = path.resolve(".thumbnails");
 const DIST = path.resolve("dist");
 const OUT = path.join(DIST, PACKAGE);
 
-/** Content gate: a template containing any of these fails the build. */
+/** Content gate: a template containing any of these is left out. */
 const GATE = {
   scripts: "script modules",
   vba: "a VBA project",
@@ -90,9 +94,9 @@ interface Entry {
   thumbnailDark?: string;
 }
 
-const problems: string[] = [];
+const problems: { where: string; message: string }[] = [];
 function fail(where: string, message: string): void {
-  problems.push(`${where}: ${message}`);
+  problems.push({ where, message });
 }
 
 /** "yearly-calendar" becomes "Yearly Calendar". */
@@ -387,18 +391,23 @@ async function build(): Promise<void> {
   for (const item of top) {
     if (item.name.startsWith(".")) continue;
     if (item.isFile()) {
-      fail(`templates/${item.name}`, "templates must sit in a category folder (templates/<category>/<name>.xlsx|.sxl|.csv)");
+      fail(`templates/${item.name}`, "ignored; templates must sit in a category folder (templates/<category>/<name>.xlsx|.sxl|.csv)");
     }
   }
 
   for (const dir of top.filter((d) => d.isDirectory() && !d.name.startsWith(".")).sort((a, b) => a.name.localeCompare(b.name))) {
     const id = dir.name;
     const catDir = path.join(SRC, id);
+    const catBefore = problems.length;
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) fail(`templates/${id}`, "category folders must be lowercase-kebab-case");
 
     const files = await fs.readdir(catDir, { withFileTypes: true });
     const names = new Set(files.filter((f) => f.isFile()).map((f) => f.name));
     const catInfo = names.has("_category.json") ? await readCategory(path.join(catDir, "_category.json")) : {};
+    if (problems.length > catBefore) {
+      console.log(`SKIP  ${id}/  category left out`);
+      continue;
+    }
     /** Template file names by base name. Thumbnails and descriptions are matched on the base name. */
     const templates = new Map<string, string[]>();
     for (const name of names) {
@@ -414,7 +423,7 @@ async function build(): Promise<void> {
       // Dot files, and the `~$<name>.xlsx` lock file Excel keeps beside a workbook it has open.
       if (f.name.startsWith(".") || f.name.startsWith("~$")) continue;
       if (f.isDirectory()) {
-        fail(rel, "nested folders are not supported; one category level only");
+        fail(rel, "ignored; nested folders are not supported, one category level only");
         continue;
       }
       const ext = path.extname(f.name).toLowerCase();
@@ -422,34 +431,43 @@ async function build(): Promise<void> {
       if (f.name === "_category.json") continue;
       if (THUMBNAIL_EXTENSIONS.includes(ext)) {
         const owner = base.endsWith(DARK_SUFFIX) ? base.slice(0, -DARK_SUFFIX.length) : base;
-        if (!templates.has(owner)) fail(rel, `thumbnail has no matching template ${owner}.xlsx|.sxl|.csv`);
+        if (!templates.has(owner)) fail(rel, `ignored; thumbnail has no matching template ${owner}.xlsx|.sxl|.csv`);
         continue;
       }
       if (ext === DESCRIPTION_EXTENSION) {
-        if (!templates.has(base)) fail(rel, `description has no matching template ${base}.xlsx|.sxl|.csv`);
+        if (!templates.has(base)) fail(rel, `ignored; description has no matching template ${base}.xlsx|.sxl|.csv`);
         continue;
       }
       if (!TEMPLATE_EXTENSIONS.includes(ext)) {
-        fail(rel, `unsupported file type "${ext}"; templates are ${TEMPLATE_EXTENSIONS.join(", ")}`);
+        fail(rel, `ignored; unsupported file type "${ext}", templates are ${TEMPLATE_EXTENSIONS.join(", ")}`);
         continue;
       }
+      const before = problems.length;
       if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(base)) fail(rel, "template file names must be lowercase-kebab-case");
       if (templates.get(base)!.length > 1) fail(rel, `another template shares the name "${base}" (${templates.get(base)!.join(", ")})`);
 
-      const before = problems.length;
-      const summary = await validateTemplate(path.join(catDir, f.name));
-      console.log(`${problems.length > before ? "FAIL" : "  ok"}  ${id}/${f.name}  ${summary}`);
+      let summary: string;
+      try {
+        summary = await validateTemplate(path.join(catDir, f.name));
+      } catch (err: any) {
+        fail(rel, `validation threw: ${err?.message ?? err}`);
+        summary = "validation threw";
+      }
+      const descriptionName = `${base}${DESCRIPTION_EXTENSION}`;
+      const description = names.has(descriptionName) ? await readDescription(path.join(catDir, descriptionName)) : undefined;
+
+      if (problems.length > before) {
+        console.log(`SKIP  ${id}/${f.name}  ${summary}`);
+        continue;
+      }
+      console.log(`  ok  ${id}/${f.name}  ${summary}`);
 
       const entry: Entry = {
         path: `${id}/${f.name}`,
         category: id,
         title: toName(base),
       };
-      const descriptionName = `${base}${DESCRIPTION_EXTENSION}`;
-      if (names.has(descriptionName)) {
-        const description = await readDescription(path.join(catDir, descriptionName));
-        if (description) entry.description = description;
-      }
+      if (description) entry.description = description;
       for (const [key, suffix] of [["thumbnail", ""], ["thumbnailDark", DARK_SUFFIX]] as const) {
         const handMade = THUMBNAIL_EXTENSIONS.map((e) => `${base}${suffix}${e}`).find((n) => names.has(n));
         const rendered = path.join(RENDERED, id, `${base}${suffix}.webp`);
@@ -467,7 +485,7 @@ async function build(): Promise<void> {
     }
 
     if (count === 0) {
-      fail(`templates/${id}`, "category has no templates");
+      fail(`templates/${id}`, "category left out; it has no valid templates");
       continue;
     }
     const category: Category = { id, title: catInfo.title ?? toName(id) };
@@ -477,11 +495,20 @@ async function build(): Promise<void> {
     categories.push(category);
   }
 
-  if (entries.length === 0) fail("templates", "no templates found");
-
   if (problems.length) {
-    console.error(`\nBuild failed with ${problems.length} problem(s):`);
-    for (const p of problems) console.error(`  - ${p}`);
+    console.warn(`\n${problems.length} problem(s):`);
+    for (const { where, message } of problems) {
+      console.warn(`  - ${where}: ${message}`);
+      // A GitHub Actions annotation, so a left-out template shows on the run summary and the PR.
+      if (process.env.GITHUB_ACTIONS) console.log(`::warning file=${where}::${message.replace(/\r?\n/g, " ")}`);
+    }
+  }
+  if (entries.length === 0) {
+    console.error("\nBuild failed: no valid templates found");
+    process.exit(1);
+  }
+  if (STRICT && problems.length) {
+    console.error(`\nBuild failed (--strict) with ${problems.length} problem(s)`);
     process.exit(1);
   }
 
