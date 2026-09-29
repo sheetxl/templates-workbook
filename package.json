@@ -1,6 +1,6 @@
 {
   "name": "@sheetxl/workbook-templates",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Workbook templates for the SheetXL New Workbook gallery",
   "type": "module",
   "main": "dist/workbook-templates/contents.json",
