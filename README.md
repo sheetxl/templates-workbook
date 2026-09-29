@@ -30,7 +30,7 @@ That is all. CI validates the workbook, builds the index and publishes it.
 - **A `<name>.txt` beside the template is its description.** The gallery shows it as the tile's
   tooltip and searches it. Keep it to a sentence or two of plain text (under 300 characters); line
   breaks are folded to spaces, and markup keeps the template out of the catalog.
-- **Thumbnails come from CI.** You do not need to make one. CI opens each template in the pinned
+- **Thumbnails come from CI.** You do not need to make one. CI opens each template in the latest beta
   SheetXL studio (`render/`) and photographs its first screen twice: once light, and once dark with
   the dark grid on. The headers and the selection are left out. A hand-made `<name>.png` (or
   `<name>.dark.png`) beside the template is used instead, for a template whose first screen is not

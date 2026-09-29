@@ -267,9 +267,14 @@ async function inspectWorkbook(wb: IWorkbook): Promise<WorkbookFindings> {
   const otherErrors: string[] = [];
   let formulas = 0;
 
-  // The 0.8.0-beta.1 xlsx writer does not persist script modules, so today only an .sxl can carry
+  // As of 0.8.0-beta.1 the xlsx writer does not persist script modules, so only an .sxl can carry
   // them.
-  const modules = wb.getScripts().getModules().getItems();
+  // 0.8.0-beta.3 can return no collection for a workbook without modules. Modules can also belong
+  // to a sheet.
+  const modules = [
+    ...(wb.getScripts().getModules()?.getItems() ?? []),
+    ...wb.getSheets().getItems().flatMap((sheet) => sheet.getModules?.()?.getItems() ?? []),
+  ];
   for (const module of modules) add("scripts", (module as any).getName?.() ?? "module");
 
   const externalBooks = (wb.getExternalBooks().toJSON() ?? []).length;

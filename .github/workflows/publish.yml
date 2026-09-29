@@ -22,6 +22,10 @@ on:
   # Actions tab > Run workflow: publishes a new version even without template changes.
   workflow_dispatch:
 
+# Read by the SheetXL SDK. Empty on fork PRs (no secrets), which then run as an evaluation.
+env:
+  SHEETXL_LICENSE_KEY: ${{ secrets.SHEETXL_LICENSE_KEY }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,6 +42,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The templates are validated and photographed with the newest SheetXL beta on npm, not the
+      # one in the lockfile. --no-save leaves package.json and the lockfile as committed.
+      - name: Update SheetXL to the latest beta
+        run: |
+          npm run sheetxl:beta -- --no-save
+          npm ls @sheetxl/sdk @sheetxl/io @sheetxl/studio-mui
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -98,6 +109,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The templates are validated and photographed with the newest SheetXL beta on npm, not the
+      # one in the lockfile. --no-save leaves package.json and the lockfile as committed.
+      - name: Update SheetXL to the latest beta
+        run: |
+          npm run sheetxl:beta -- --no-save
+          npm ls @sheetxl/sdk @sheetxl/io @sheetxl/studio-mui
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

@@ -5,7 +5,7 @@
  *
  *   npm run thumbnails [-- <filter>]
  *
- * Each template is opened by `render/` (the pinned @sheetxl/studio-mui) in headless Chromium,
+ * Each template is opened by `render/` (the installed @sheetxl/studio-mui) in headless Chromium,
  * photographed once the grid has painted and its fonts have loaded, and scaled down to webp. The
  * dark one is the dark app with the dark grid on. A hand-made `templates/<category>/<name>.png|.webp`
  * (or `<name>.dark.png|.webp`) wins over the rendered one for that scheme, so it is skipped.
@@ -29,8 +29,8 @@ const SCALE = 2;
 /** The grid's cell area: every pane, frozen ones included, and none of the headers. */
 const CELLS_SELECTOR = ".sheetxl-sheet-primary";
 /**
- * What the grid draws around the cells inside its cell area, in CSS pixels, measured on the pinned
- * studio: a 3px header-colored strip on the left, a 1px line on top and 2px on the right. Not
+ * What the grid draws around the cells inside its cell area, in CSS pixels, measured on the
+ * 0.8.0-beta.1 studio: a 3px header-colored strip on the left, a 1px line on top and 2px on the right. Not
  * photographed.
  */
 const CELLS_INSET = { left: 3, top: 1, right: 2, bottom: 0 };
@@ -86,6 +86,12 @@ async function main(): Promise<void> {
   const failures: string[] = [];
   try {
     const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: SCALE });
+    // The browser SDK looks for its key in `sheetxl.lic` beside the page. Serve it from the
+    // environment, so the key is never written to disk or into the bundle.
+    const licenseKey = process.env.SHEETXL_LICENSE_KEY;
+    if (licenseKey) {
+      await context.route("**/sheetxl.lic", (route) => route.fulfill({ body: `# License Key\n${licenseKey}\n` }));
+    }
     for (const { rel, scheme } of jobs) {
       const label = `${rel} (${scheme})`;
       const page = await context.newPage();
