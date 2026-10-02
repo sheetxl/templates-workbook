@@ -8,11 +8,11 @@
 ## Overview
 
 The workbook templates that appear in the SheetXL **New Workbook** gallery. The repo is published to
-npm as [`@sheetxl/workbook-templates`](https://www.npmjs.com/package/@sheetxl/workbook-templates),
+npm as [`@sheetxl/templates-workbook`](https://www.npmjs.com/package/@sheetxl/templates-workbook),
 and the SheetXL studio reads the catalog straight from unpkg:
 
 ```text
-https://unpkg.com/@sheetxl/workbook-templates/dist/workbook-templates/contents.json
+https://unpkg.com/@sheetxl/templates-workbook/dist/templates-workbook/contents.json
 ```
 
 Every template is original content, dedicated to the public domain under [CC0 1.0](LICENSE). Use
@@ -66,18 +66,18 @@ The build writes:
 
 ```text
 dist/contents.json                                root listing of every file and folder
-dist/workbook-templates/contents.json             the catalog
-dist/workbook-templates/<category>/<name>.xlsx      or .sxl, .csv
-dist/workbook-templates/<category>/<name>.webp    the rendered thumbnail, or a hand-made .png
-dist/workbook-templates/<category>/<name>.dark.webp   the same on the dark grid
+dist/templates-workbook/contents.json             the catalog
+dist/templates-workbook/<category>/<name>.xlsx      or .sxl, .csv
+dist/templates-workbook/<category>/<name>.webp    the rendered thumbnail, or a hand-made .png
+dist/templates-workbook/<category>/<name>.dark.webp   the same on the dark grid
 ```
 
-The catalog looks like this. Entry paths are relative to `dist/workbook-templates/`.
+The catalog looks like this. Entry paths are relative to `dist/templates-workbook/`.
 
 ```jsonc
 {
   "kind": "templates",
-  "package": "workbook-templates",
+  "package": "templates-workbook",
   "meta": {
     "schema": 1,
     "categories": [{ "id": "finance", "title": "Finance", "description": "..." }]
@@ -115,8 +115,16 @@ an annotation in GitHub Actions) and publishes the rest; it fails only when no t
 
 ## Publishing
 
-A push to `main` that changes `templates/` or `config/` builds the catalog, bumps the patch version,
-tags it, publishes to npm and creates a GitHub release. To publish without a template change, run
+There are two channels, one per branch:
+
+| branch | version | npm dist-tag | read from |
+| --- | --- | --- | --- |
+| `main` | `X.Y.Z` | `latest` | `https://unpkg.com/@sheetxl/templates-workbook/dist` |
+| `beta` | `X.Y.Z-beta.N` | `beta` | `https://unpkg.com/@sheetxl/templates-workbook@beta/dist` |
+
+A push to either branch that changes `templates/` or `config/` builds the catalog, bumps the
+version, publishes to npm, tags it and creates a GitHub release. Merging `beta` into `main` promotes
+it: the next `main` publish drops the `-beta.N` suffix. To publish without a template change, run
 the workflow from the Actions tab (**Run workflow**), or put `[publish]` in the message of a commit
 that changes `render/`, `package.json` or the workflow.
 

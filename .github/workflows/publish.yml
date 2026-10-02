@@ -1,8 +1,10 @@
 name: Build and Publish Templates
 
+# `main` publishes the stable channel (npm dist-tag `latest`); `beta` publishes prereleases
+# (`X.Y.Z-beta.N`, dist-tag `beta`).
 on:
   push:
-    branches: [main]
+    branches: [main, beta]
     paths:
       - 'templates/**'
       - 'config/**'
@@ -11,7 +13,7 @@ on:
       - 'package-lock.json'
       - '.github/workflows/publish.yml'
   pull_request:
-    branches: [main]
+    branches: [main, beta]
     paths:
       - 'templates/**'
       - 'config/**'
@@ -25,6 +27,8 @@ on:
 # Read by the SheetXL SDK. Empty on fork PRs (no secrets), which then run as an evaluation.
 env:
   SHEETXL_LICENSE_KEY: ${{ secrets.SHEETXL_LICENSE_KEY }}
+  # A pull request is checked against the channel of the branch it targets.
+  CHANNEL: ${{ (github.base_ref || github.ref_name) == 'beta' && 'beta' || 'latest' }}
 
 jobs:
   build:
@@ -61,7 +65,7 @@ jobs:
 
       - name: Validate generated files
         run: |
-          for f in dist/contents.json dist/workbook-templates/contents.json; do
+          for f in dist/contents.json dist/templates-workbook/contents.json; do
             if [ ! -f "$f" ]; then
               echo "Error: $f was not generated"
               exit 1
@@ -69,15 +73,15 @@ jobs:
           done
           node -e '
             const fs = require("fs");
-            const catalog = JSON.parse(fs.readFileSync("dist/workbook-templates/contents.json", "utf-8"));
+            const catalog = JSON.parse(fs.readFileSync("dist/templates-workbook/contents.json", "utf-8"));
             const root = JSON.parse(fs.readFileSync("dist/contents.json", "utf-8"));
-            if (catalog.kind !== "templates" || catalog.package !== "workbook-templates") throw new Error("catalog header is wrong");
+            if (catalog.kind !== "templates" || catalog.package !== "templates-workbook") throw new Error("catalog header is wrong");
             if (!Array.isArray(catalog.entries) || catalog.entries.length === 0) throw new Error("catalog has no entries");
             const listed = new Set(root.entries.map((e) => e.path));
             for (const e of catalog.entries) {
               for (const p of [e.path, e.thumbnail, e.thumbnailDark].filter(Boolean)) {
-                if (!fs.existsSync("dist/workbook-templates/" + p)) throw new Error("missing file " + p);
-                if (!listed.has("workbook-templates/" + p)) throw new Error("root listing is missing " + p);
+                if (!fs.existsSync("dist/templates-workbook/" + p)) throw new Error("missing file " + p);
+                if (!listed.has("templates-workbook/" + p)) throw new Error("root listing is missing " + p);
               }
             }
             console.log("Catalog has " + catalog.entries.length + " templates in " + catalog.meta.categories.length + " categories");
@@ -85,7 +89,7 @@ jobs:
           echo "Generated files validated"
 
   publish:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -97,7 +101,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.ref_name }}
           # Full history and tags, so the change check can diff against the last release.
           fetch-depth: 0
 
@@ -132,27 +136,20 @@ jobs:
 
       - name: Check if version should be bumped
         id: version_check
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           echo "Last tag: ${LAST_TAG:-<none>}"
-
-          if [[ -z "$LAST_TAG" ]]; then
-            # First release publishes the version in package.json as-is.
-            echo "No release yet"
-            echo "should_publish=true" >> $GITHUB_OUTPUT
-            echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-            exit 0
-          fi
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "Manual publish requested"
             SHOULD_PUBLISH=true
-          elif [[ "${{ github.event.head_commit.message }}" == *"[publish]"* ]]; then
+          elif [[ "$COMMIT_MESSAGE" == *"[publish]"* ]]; then
             echo "Force publish requested in commit message"
             SHOULD_PUBLISH=true
-          elif ! git diff --quiet "$LAST_TAG" HEAD -- templates/ config/; then
-            echo "Template changes detected since $LAST_TAG"
+          elif [[ -z "$LAST_TAG" ]] || ! git diff --quiet "$LAST_TAG" HEAD -- templates/ config/; then
+            echo "Template changes detected since ${LAST_TAG:-the first commit}"
             SHOULD_PUBLISH=true
           else
             echo "No template changes since $LAST_TAG"
@@ -160,34 +157,37 @@ jobs:
           fi
           echo "should_publish=$SHOULD_PUBLISH" >> $GITHUB_OUTPUT
 
-          if [[ "$SHOULD_PUBLISH" == "true" ]]; then
-            # Auto-increment patch version
-            NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
-            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-            echo "Bumping version from $CURRENT_VERSION to $NEW_VERSION"
-          fi
-
+      # beta: 0.1.8 -> 0.1.9-beta.0 -> 0.1.9-beta.1. main: 0.1.8 -> 0.1.9, and a prerelease merged
+      # in from beta (0.1.9-beta.3) -> 0.1.9.
       # The version is written locally, published, and only then committed and tagged, so a failed
       # publish leaves no tag behind and the next run retries the same version.
       - name: Update version
-        if: steps.version_check.outputs.should_publish == 'true' && steps.version_check.outputs.new_version != steps.current_version.outputs.version
-        run: npm version ${{ steps.version_check.outputs.new_version }} --no-git-tag-version
+        id: new_version
+        if: steps.version_check.outputs.should_publish == 'true'
+        run: |
+          if [[ "$CHANNEL" == "beta" ]]; then
+            npm version prerelease --preid=beta --no-git-tag-version
+          else
+            npm version patch --no-git-tag-version
+          fi
+          VERSION=$(npm pkg get version | tr -d '"')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Bumping version from ${{ steps.current_version.outputs.version }} to $VERSION ($CHANNEL)"
 
+      # --tag is always explicit: npm assigns `latest` to any publish without one, prerelease or not.
       - name: Publish to npm
         if: steps.version_check.outputs.should_publish == 'true'
-        run: npm publish --access public
+        run: npm publish --access public --tag "$CHANNEL"
 
       - name: Commit version and tag release
         if: steps.version_check.outputs.should_publish == 'true'
         run: |
-          VERSION="${{ steps.version_check.outputs.new_version }}"
+          VERSION="${{ steps.new_version.outputs.version }}"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          if ! git diff --quiet -- package.json package-lock.json; then
-            git add package.json package-lock.json
-            git commit -m "Bump version to $VERSION [skip ci]"
-            git push
-          fi
+          git add package.json package-lock.json
+          git commit -m "Bump version to $VERSION [skip ci]"
+          git push
           git tag "v$VERSION"
           git push origin "v$VERSION"
 
@@ -196,15 +196,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.version_check.outputs.new_version }}"
-          gh release create "v$VERSION" \
+          VERSION="${{ steps.new_version.outputs.version }}"
+          if [[ "$CHANNEL" == "beta" ]]; then
+            RELEASE_FLAGS="--prerelease --latest=false"
+          else
+            RELEASE_FLAGS="--latest"
+          fi
+          gh release create "v$VERSION" $RELEASE_FLAGS \
             --title "Release v$VERSION" \
             --notes "Updated SheetXL workbook templates.
 
-          Catalog: https://unpkg.com/@sheetxl/workbook-templates@$VERSION/dist/workbook-templates/contents.json
+          Catalog: https://unpkg.com/@sheetxl/templates-workbook@$VERSION/dist/templates-workbook/contents.json
 
           \`\`\`bash
-          npm install @sheetxl/workbook-templates@$VERSION
+          npm install @sheetxl/templates-workbook@$VERSION
           \`\`\`
 
-          See the [commit history](https://github.com/sheetxl/workbook-templates/commits/v$VERSION) for details."
+          See the [commit history](https://github.com/sheetxl/templates-workbook/commits/v$VERSION) for details."

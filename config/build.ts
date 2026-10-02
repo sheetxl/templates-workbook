@@ -12,10 +12,10 @@
  * Output:
  *
  *   dist/contents.json                              root listing of every file and folder
- *   dist/workbook-templates/contents.json           the catalog
- *   dist/workbook-templates/<category>/<name>.xlsx|.sxl|.csv
- *   dist/workbook-templates/<category>/<name>.webp|.png
- *   dist/workbook-templates/<category>/<name>.dark.webp|.png
+ *   dist/templates-workbook/contents.json           the catalog
+ *   dist/templates-workbook/<category>/<name>.xlsx|.sxl|.csv
+ *   dist/templates-workbook/<category>/<name>.webp|.png
+ *   dist/templates-workbook/<category>/<name>.dark.webp|.png
  *
  * A template with a problem is left out of the catalog, and a category with a problem is left out
  * with its templates; every problem is listed as a warning and the build succeeds. Only a catalog
@@ -30,7 +30,7 @@ import { IOPlugin } from "@sheetxl/io";
 
 await WorkbookIO.install(IOPlugin);
 
-const PACKAGE = "workbook-templates";
+const PACKAGE = "templates-workbook";
 const SCHEMA = 1;
 const MAX_BYTES = 2 * 1024 * 1024;
 /** The template formats, by file extension, and the SDK format each is read as. */

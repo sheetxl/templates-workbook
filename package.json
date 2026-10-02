@@ -1,9 +1,9 @@
 {
-  "name": "@sheetxl/workbook-templates",
+  "name": "@sheetxl/templates-workbook",
   "version": "0.1.8",
   "description": "Workbook templates for the SheetXL New Workbook gallery",
   "type": "module",
-  "main": "dist/workbook-templates/contents.json",
+  "main": "dist/templates-workbook/contents.json",
   "files": [
     "dist/**/*"
   ],
@@ -27,12 +27,12 @@
   "license": "CC0-1.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sheetxl/workbook-templates.git"
+    "url": "git+https://github.com/sheetxl/templates-workbook.git"
   },
   "bugs": {
-    "url": "https://github.com/sheetxl/workbook-templates/issues"
+    "url": "https://github.com/sheetxl/templates-workbook/issues"
   },
-  "homepage": "https://github.com/sheetxl/workbook-templates#readme",
+  "homepage": "https://github.com/sheetxl/templates-workbook#readme",
   "publishConfig": {
     "access": "public"
   },
