@@ -1,5 +1,6 @@
 {
   "title": "Project Management",
   "description": "Plan work and keep track of who is doing what.",
-  "order": 3
+  "order": 3,
+  "color": "#1565c0"
 }

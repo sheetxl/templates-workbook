@@ -7,7 +7,8 @@
  *   templates/<category>/<name>.dark.webp|.png optional hand-made dark thumbnail
  *   .thumbnails/<category>/<name>[.dark].webp   the rendered thumbnails (`npm run thumbnails`), used
  *                                               when there is no hand-made one
- *   templates/<category>/_category.json        optional: { title?, description?, order?, icon? }
+ *   templates/<category>/_category.json        optional: { title?, description?, order?, icon?, color? }
+ *                                               `color` is a hex (`#2e7d32`) for light mode; dark mode inverts it
  *
  * Output:
  *
@@ -74,6 +75,7 @@ interface CategoryFile {
   description?: string;
   order?: number;
   icon?: string;
+  color?: string;
 }
 
 interface Category {
@@ -81,6 +83,7 @@ interface Category {
   title: string;
   description?: string;
   icon?: string;
+  color?: string;
   order?: number;
 }
 
@@ -143,6 +146,16 @@ function optString(where: string, json: Record<string, unknown>, key: string): s
   return v.trim();
 }
 
+function optColor(where: string, json: Record<string, unknown>, key: string): string | undefined {
+  const v = optString(where, json, key);
+  if (v === undefined) return undefined;
+  if (!/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) {
+    fail(where, `"${key}" must be a hex color (#rgb or #rrggbb)`);
+    return undefined;
+  }
+  return v;
+}
+
 async function readCategory(file: string): Promise<CategoryFile> {
   const where = posix(path.relative(process.cwd(), file));
   const json = await readJSON(file);
@@ -152,7 +165,7 @@ async function readCategory(file: string): Promise<CategoryFile> {
     return {};
   }
   const obj = json as Record<string, unknown>;
-  checkKeys(where, obj, ["title", "description", "order", "icon"]);
+  checkKeys(where, obj, ["title", "description", "order", "icon", "color"]);
   if (obj.order !== undefined && (typeof obj.order !== "number" || !Number.isFinite(obj.order))) {
     fail(where, `"order" must be a number`);
   }
@@ -161,6 +174,7 @@ async function readCategory(file: string): Promise<CategoryFile> {
     description: optString(where, obj, "description"),
     order: typeof obj.order === "number" ? obj.order : undefined,
     icon: optString(where, obj, "icon"),
+    color: optColor(where, obj, "color"),
   };
 }
 
@@ -496,6 +510,7 @@ async function build(): Promise<void> {
     const category: Category = { id, title: catInfo.title ?? toName(id) };
     if (catInfo.description) category.description = catInfo.description;
     if (catInfo.icon) category.icon = catInfo.icon;
+    if (catInfo.color) category.color = catInfo.color;
     if (catInfo.order !== undefined) category.order = catInfo.order;
     categories.push(category);
   }
