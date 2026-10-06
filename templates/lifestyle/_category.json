@@ -1,5 +1,6 @@
 {
   "title": "Lifestyle",
   "description": "Everyday planning and personal tracking.",
-  "order": 2
+  "order": 2,
+  "color": "#d84315"
 }

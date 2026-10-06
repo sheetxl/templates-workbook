@@ -48,7 +48,7 @@ submit Microsoft Office templates or close copies of them.
 ```text
 templates/
   <category>/
-    _category.json        optional: { "title", "description", "order", "icon" }
+    _category.json        optional: { "title", "description", "order", "icon", "color" }
     <name>.xlsx           a template (or <name>.sxl, <name>.csv)
     <name>.txt            optional plain-text description, the tile's tooltip
     <name>.png            optional hand-made thumbnail
@@ -58,7 +58,8 @@ config/build.ts           validates every template, then writes dist/
 render/                   the page that renders one template for its thumbnail
 ```
 
-A category folder's `_category.json` sets its display title, description, sort `order` and icon.
+A category folder's `_category.json` sets its display title, description, sort `order`, icon and
+`color`. The color is a hex (`"#2e7d32"`) chosen for light mode; the gallery inverts it for dark mode.
 Without one, the title comes from the folder name ("project-management" becomes "Project
 Management"). Categories sort by `order`, then by title. Templates sort by title within a category.
 
