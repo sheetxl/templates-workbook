@@ -44,14 +44,16 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      # --ignore-scripts skips `prepare`, which would build against the SheetXL in the lockfile.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
-      # The templates are validated and photographed with the newest SheetXL beta on npm, not the
-      # one in the lockfile. --no-save leaves package.json and the lockfile as committed.
-      - name: Update SheetXL to the latest beta
+      # The templates are validated and photographed with the newest SheetXL on the branch's channel
+      # (`beta` or `latest`), not the one in the lockfile. --no-save leaves package.json and the
+      # lockfile as committed.
+      - name: Update SheetXL to the channel's newest release
         run: |
-          npm run sheetxl:beta -- --no-save
+          npm install --no-save --ignore-scripts @sheetxl/sdk@$CHANNEL @sheetxl/io@$CHANNEL @sheetxl/studio-mui@$CHANNEL
           npm ls @sheetxl/sdk @sheetxl/io @sheetxl/studio-mui
 
       - name: Install Chromium
@@ -111,14 +113,16 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      # --ignore-scripts skips `prepare`, which would build against the SheetXL in the lockfile.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
-      # The templates are validated and photographed with the newest SheetXL beta on npm, not the
-      # one in the lockfile. --no-save leaves package.json and the lockfile as committed.
-      - name: Update SheetXL to the latest beta
+      # The templates are validated and photographed with the newest SheetXL on the branch's channel
+      # (`beta` or `latest`), not the one in the lockfile. --no-save leaves package.json and the
+      # lockfile as committed.
+      - name: Update SheetXL to the channel's newest release
         run: |
-          npm run sheetxl:beta -- --no-save
+          npm install --no-save --ignore-scripts @sheetxl/sdk@$CHANNEL @sheetxl/io@$CHANNEL @sheetxl/studio-mui@$CHANNEL
           npm ls @sheetxl/sdk @sheetxl/io @sheetxl/studio-mui
 
       - name: Install Chromium

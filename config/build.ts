@@ -287,7 +287,7 @@ async function inspectWorkbook(wb: IWorkbook): Promise<WorkbookFindings> {
   // to a sheet.
   const modules = [
     ...(wb.getScripts().getModules()?.getItems() ?? []),
-    ...wb.getSheets().getItems().flatMap((sheet) => sheet.getModules?.()?.getItems() ?? []),
+    ...wb.getWorksheets().getItems().flatMap((sheet) => sheet.getModules?.()?.getItems() ?? []),
   ];
   for (const module of modules) add("scripts", (module as any).getName?.() ?? "module");
 
@@ -299,7 +299,7 @@ async function inspectWorkbook(wb: IWorkbook): Promise<WorkbookFindings> {
     if (FETCH_REGEX.test(text)) add("fetch", `defined name ${named.getName()}`);
   }
 
-  const sheets = wb.getSheets().getItems();
+  const sheets = wb.getWorksheets().getItems();
   for (const sheet of sheets) {
     // A full recalculation, so the values checked are the engine's, not whatever the file cached.
     await sheet.calculate(true);

@@ -42,9 +42,12 @@ async function readTemplate(url: string): Promise<IWorkbook> {
   await WorkbookIO.install(IOPlugin);
   const workbook = await WorkbookIO.read({ source: url });
   if (!workbook) throw new Error('the template did not read');
-  const sheet = workbook.getSelectedSheet();
-  sheet.getView().setZoomScale(ZOOM);
-  await sheet.getRange(PARKED_SELECTION).select();
+  // A chart sheet can be the selected tab; it has no grid to zoom or select in.
+  const sheet = workbook.getSelectedWorksheet();
+  if (sheet) {
+    sheet.getView().setZoomScale(ZOOM);
+    await sheet.getRange(PARKED_SELECTION).select();
+  }
   return workbook;
 }
 
