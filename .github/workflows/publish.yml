@@ -56,8 +56,11 @@ jobs:
           npm install --no-save --ignore-scripts @sheetxl/sdk@$CHANNEL @sheetxl/io@$CHANNEL @sheetxl/studio-mui@$CHANNEL
           npm ls @sheetxl/sdk @sheetxl/io @sheetxl/studio-mui
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      # Carlito and Caladea are metric twins of Calibri and Cambria, which the runner does not have.
+      - name: Install Chromium and fonts
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-crosextra-carlito fonts-crosextra-caladea
 
       - name: Render thumbnails
         run: npm run thumbnails
@@ -125,8 +128,11 @@ jobs:
           npm install --no-save --ignore-scripts @sheetxl/sdk@$CHANNEL @sheetxl/io@$CHANNEL @sheetxl/studio-mui@$CHANNEL
           npm ls @sheetxl/sdk @sheetxl/io @sheetxl/studio-mui
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      # Carlito and Caladea are metric twins of Calibri and Cambria, which the runner does not have.
+      - name: Install Chromium and fonts
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-crosextra-carlito fonts-crosextra-caladea
 
       - name: Render thumbnails
         run: npm run thumbnails
