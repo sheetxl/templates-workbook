@@ -1,0 +1,1 @@
+A project plan in weeks with a Gantt chart drawn by conditional formats. Edit a start week, a length or a progress and the bars, the phases and the status follow.

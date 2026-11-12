@@ -7,7 +7,7 @@
  * dark grid turned on.
  *
  * `window.__thumbnail` reports the outcome to `config/thumbnails.ts`: `'ready'` once the grid has
- * painted, or an error message.
+ * painted with everything on screen drawn, or an error message.
  */
 import { createRoot } from 'react-dom/client';
 
@@ -15,6 +15,7 @@ import { WorkbookIO } from '@sheetxl/sdk';
 import type { IWorkbook } from '@sheetxl/sdk';
 import { IOPlugin } from '@sheetxl/io';
 import { WorkbookElement } from '@sheetxl/studio-mui';
+import { whenRenderSettled } from '@sheetxl/utils-react';
 
 declare global {
   interface Window { __thumbnail?: 'ready' | { error: string } }
@@ -29,6 +30,10 @@ const PARKED_SELECTION = 'XFD1048576';
 /** Zoomed out a little, so a thumbnail shows more of the template. */
 const ZOOM = 70;
 
+const nextFrame = (): Promise<void> => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+/** Resolves after the browser has painted what is committed now. */
+const painted = async (): Promise<void> => { await nextFrame(); await nextFrame(); };
+
 const reportError = (error: unknown): void => {
   window.__thumbnail = { error: error instanceof Error ? error.message : String(error) };
 };
@@ -42,9 +47,12 @@ async function readTemplate(url: string): Promise<IWorkbook> {
   await WorkbookIO.install(IOPlugin);
   const workbook = await WorkbookIO.read({ source: url });
   if (!workbook) throw new Error('the template did not read');
-  const sheet = workbook.getSelectedSheet();
-  sheet.getView().setZoomScale(ZOOM);
-  await sheet.getRange(PARKED_SELECTION).select();
+  // A chart sheet can be the selected tab; it has no grid to zoom or select in.
+  const sheet = workbook.getSelectedWorksheet();
+  if (sheet) {
+    sheet.getView().setZoomScale(ZOOM);
+    await sheet.getRange(PARKED_SELECTION).select();
+  }
   return workbook;
 }
 
@@ -66,9 +74,15 @@ const App = () => {
       gridColorScheme={scheme}
       propsSheet={{ showColumnHeaders: false, showRowHeaders: false }}
       style={{ position: 'absolute', inset: 0, colorScheme: scheme }}
-      onWorkbookLoad={() => {
-        // The load event fires one frame before the grid paints.
-        requestAnimationFrame(() => requestAnimationFrame(() => { window.__thumbnail = 'ready'; }));
+      onWorkbookLoad={async () => {
+        // The load event fires before the grid paints, and before its pictures, charts and sheet
+        // background have finished drawing. Wait for all of it, then for the paint.
+        const loaded = await workbook;
+        await loaded.whenFontsReady();
+        await painted();
+        await whenRenderSettled(loaded);
+        await painted();
+        window.__thumbnail = 'ready';
       }}
       renderWorkbookError={({ error }) => {
         reportError(error);

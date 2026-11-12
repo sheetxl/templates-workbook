@@ -1,0 +1,1 @@
+A sales dashboard over 600 orders: KPI tiles, charts, a pivot table, dynamic arrays and conditional formats, all live from the Orders sheet.

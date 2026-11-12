@@ -1,0 +1,1 @@
+Three puzzles, from easy to hard. Type digits 1 to 9. Highlight repeats marks a digit used twice in a row, column or box, and Show mistakes checks your entries against the hidden answer key.

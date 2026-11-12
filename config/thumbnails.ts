@@ -35,7 +35,7 @@ const CELLS_SELECTOR = ".sheetxl-sheet-primary";
  */
 const CELLS_INSET = { left: 3, top: 1, right: 2, bottom: 0 };
 /** The published thumbnail, in pixels. Cropped from the top left of the cell area to 8:5. */
-const THUMBNAIL = { width: 480, height: 300 };
+const THUMBNAIL = { width: 960, height: 600 };
 const LOAD_TIMEOUT = 60_000;
 
 const HAND_MADE = [".png", ".webp"];

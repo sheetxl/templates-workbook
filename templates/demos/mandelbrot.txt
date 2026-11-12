@@ -1,0 +1,1 @@
+One dynamic array formula draws the Mandelbrot set, and a color scale paints it. Change the center or the zoom and it redraws.
